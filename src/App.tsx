@@ -1,50 +1,95 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
+import Header from "./components/Header";
+import Card from "./components/Card";
 import "./App.css";
+import "./assets/pico.colors.css";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useEffect, useState } from "react";
+
+const STORAGE_KEY = 'recent-urls';
+const MAX_ITEMS = 5;
 
 function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+  const [urls, setUrls] = useState<string[]>([]);
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
+  useEffect(() => {
+    const storedUrls = localStorage.getItem(STORAGE_KEY);
+    if (storedUrls) {
+      setUrls(JSON.parse(storedUrls));
+    }
+  }, []);
+
+  const saveUrls = (newUrls: string[]) => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newUrls));
+    setUrls(newUrls);
+  };
+
+  const handleGo = async () => {
+    const urlInput = document.getElementById('url-input') as HTMLInputElement;
+    const url = urlInput?.value;
+    if (!url) return;
+
+    try {
+      const validatedUrl = new URL(url);
+      
+      // Adicionar URL ao histórico
+      const newUrls = [validatedUrl.href, ...urls.filter(u => u !== validatedUrl.href)];
+      if (newUrls.length > MAX_ITEMS) {
+        newUrls.pop(); // Remove o mais antigo
+      }
+      saveUrls(newUrls);
+      
+      // Limpar input
+      urlInput.value = '';
+      
+      // Navegar para a URL
+      await getCurrentWindow().setIgnoreCursorEvents(true);
+      window.location.href = validatedUrl.href;
+    } catch (error) {
+      console.error('Invalid URL', error);
+      return;
+    }
   }
 
+  const handleCardClick = async (url: string) => {
+    try {
+      await getCurrentWindow().setIgnoreCursorEvents(true);
+      window.location.href = url;
+    } catch (error) {
+      console.error('Error navigating to URL', error);
+    }
+  };
+
+  const handleDelete = (urlToDelete: string) => {
+    const newUrls = urls.filter(url => url !== urlToDelete);
+    saveUrls(newUrls);
+  };
+
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
+    <>
+      <Header />
+      <div className="flex flex-col h-screen">
+        <div className="p-4">
+          <input
+            id="url-input"
+            placeholder="Enter a URL..."
+          />
+          <button className="w-full" onClick={handleGo}>Go</button>
+        </div>
 
-      <div className="row">
-        <a href="https://vitejs.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://reactjs.org" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+        <div className="px-4 min-h-0 flex-1">
+          <div className="flex flex-col gap-2">
+            {urls.map((url) => (
+              <Card 
+                key={url}
+                url={url}
+                onClick={() => handleCardClick(url)}
+                onDelete={() => handleDelete(url)}
+              />
+            ))}
+          </div>
+        </div>
       </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
+    </>
   );
 }
 

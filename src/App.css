@@ -1,4 +1,13 @@
 @import "tailwindcss";
 
+html {
+  background: transparent;
 }
 
+#root {
+  background: var(--pico-background-color);
+  border-radius: var(--pico-border-radius);
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
